@@ -3,9 +3,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Share2 } from "lucide-react";
-import { mockData } from '@/app/data/mockData';
-import { ProgressIndicator } from '@/app/components/ProgressIndicator';
-import { ShareCard } from '../components/ShareCard';
+import { mockData } from "@/app/data/mockData";
+import { ProgressIndicator } from "@/app/components/ProgressIndicator";
+import { ShareCard } from "../components/ShareCard";
+import { ShareImageCard } from "../components/ShareImageCard";
 
 const SocialIcons = {
   X: () => (
@@ -43,6 +44,24 @@ export default function ShareCardPage() {
   const [shareOpen, setShareOpen] = useState<boolean>(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareBtnRef = useRef<HTMLButtonElement | null>(null);
+  const shareImageRef = useRef<HTMLDivElement>(null);
+  const [themeColor, setThemeColor] = useState<string>("#1DB954");
+
+  // Get computed theme color from CSS variable
+  useEffect(() => {
+    // Create a temporary element to get the resolved color value
+    const tempDiv = document.createElement("div");
+    tempDiv.style.color = "var(--color-theme-primary)";
+    document.body.appendChild(tempDiv);
+
+    // Get the computed color (this will be RGB, not oklab)
+    const computedColor = window.getComputedStyle(tempDiv).color;
+    document.body.removeChild(tempDiv);
+
+    if (computedColor) {
+      setThemeColor(computedColor);
+    }
+  }, []);
 
   // --- Share Functionality ---
   const handleShare = (platform: string) => {
@@ -92,20 +111,26 @@ export default function ShareCardPage() {
 
   return (
     <div className="relative w-full h-screen">
-      <ShareCard 
+      {/* Off-screen ShareImageCard for html2canvas export */}
+      <div
+        ref={shareImageRef}
+        className="absolute"
+        style={{ left: "-9999px", top: 0 }}
+      >
+        <ShareImageCard themeColor={themeColor} />
+      </div>
+
+      <ShareCard
         username={mockData.username}
         transactions={mockData.transactions}
         persona={mockData.persona}
         topVibe={mockData.vibes[0].label}
         vibePercentage={mockData.vibes[0].percentage}
+        shareImageRef={shareImageRef}
       />
-      
-      <ProgressIndicator 
-        currentStep={6} 
-        totalSteps={6}
-        showNext={false}
-      />
-      
+
+      <ProgressIndicator currentStep={6} totalSteps={6} showNext={false} />
+
       <div className="absolute bottom-6 left-6 z-30">
         <div className="relative">
           <AnimatePresence>
@@ -133,7 +158,7 @@ export default function ShareCardPage() {
                     </span>
                   </div>
                 </button>
-                
+
                 <button
                   onClick={() => handleShare("whatsapp")}
                   className="flex items-center cursor-pointer justify-center gap-3 p-2 w-42 h-15 rounded-xl bg-[#0F0F10] hover:bg-[#1a1a1c] transition-colors"
@@ -145,7 +170,7 @@ export default function ShareCardPage() {
                     WhatsApp
                   </span>
                 </button>
-                
+
                 <button
                   onClick={() => handleShare("facebook")}
                   className="flex items-center cursor-pointer justify-center gap-3 p-2 w-42 h-15 rounded-xl bg-[#0F0F10] hover:bg-[#1a1a1c] transition-colors"
@@ -157,7 +182,7 @@ export default function ShareCardPage() {
                     Facebook
                   </span>
                 </button>
-                
+
                 <button
                   onClick={() => handleShare("linkedin")}
                   className="flex items-center justify-center cursor-pointer gap-3 p-2 w-42 h-15 rounded-xl bg-[#0F0F10] hover:bg-[#1a1a1c] transition-colors"
@@ -169,7 +194,7 @@ export default function ShareCardPage() {
                     LinkedIn
                   </span>
                 </button>
-                
+
                 <button
                   onClick={() => handleShare("telegram")}
                   className="flex items-center cursor-pointer justify-center gap-3 p-2 w-42 h-15 rounded-xl bg-[#0F0F10] hover:bg-[#1a1a1c] transition-colors"

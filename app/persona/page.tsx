@@ -5,14 +5,10 @@ import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Home, Share2, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { readStreamableValue } from "ai/rsc";
 import { ProgressIndicator } from "../components/ProgressIndicator";
-
-// --- Mock Store ---
-const useWrapperStore = {
-  data: {
-    archetype: "The Wizard",
-  },
-};
+import { useWrapStore } from "../store/wrapStore";
+import { generatePersonaDescription } from "../actions/generate-persona";
 
 // --- Asset Mapping ---
 const ARCHETYPE_DATA: Record<string, { description: string }> = {
@@ -63,8 +59,8 @@ const GlowingStar: React.FC<GlowingStarProps> = ({
       ],
     }}
     transition={{ duration: 3, repeat: Infinity, delay }}
-    className={`absolute h-1.5 w-1.5 rounded-full`}
-    style={{ backgroundColor: 'var(--color-theme-primary)' }}
+    className={`absolute h-1.5 w-1.5 rounded-full ${className}`}
+    style={{ backgroundColor: "var(--color-theme-primary)" }}
   />
 );
 
@@ -137,6 +133,7 @@ const SocialIcons = {
 export default function ArchetypeReveal(): JSX.Element {
   const controls: ReturnType<typeof useAnimation> = useAnimation();
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
+  const [streamedDescription, setStreamedDescription] = useState<string>("");
 
   // Menu states
   const [shareOpen, setShareOpen] = useState<boolean>(false); // Share menu
@@ -145,9 +142,55 @@ export default function ArchetypeReveal(): JSX.Element {
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const archetypeKey = useWrapperStore.data.archetype;
-  const data = ARCHETYPE_DATA[archetypeKey] || ARCHETYPE_DATA["The Wizard"];
+  const { result } = useWrapStore();
+  const archetypeKey = result?.persona || "The Wizard";
+
+  // Use streamed description if available, otherwise fall back to stored or default
+  const data = {
+    description:
+      streamedDescription ||
+      result?.personaDescription ||
+      ARCHETYPE_DATA[archetypeKey]?.description ||
+      ARCHETYPE_DATA["The Wizard"].description,
+  };
+
   const displayedDescription = useTypewriter(data.description, 25, 2200);
+
+  // Generate persona description on mount if not already streamed
+  useEffect(() => {
+    const generatePersona = async () => {
+      if (streamedDescription || !result) return;
+
+      try {
+        const metrics = {
+          username: result.username,
+          topDapp: result.dapps?.[0]?.name,
+          transactionCount: result.totalTransactions,
+          favoriteChain: "Stellar", // You can extract this from result if available
+          percentile: result.percentile,
+          vibes: result.vibes,
+          totalDapps: result.dapps?.length,
+        };
+
+        const response = await generatePersonaDescription(metrics);
+
+        let fullText = "";
+        for await (const chunk of readStreamableValue(response)) {
+          if (chunk) {
+            fullText += chunk;
+            setStreamedDescription(fullText);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to generate persona:", error);
+        // Fall back to existing description
+        setStreamedDescription(result?.personaDescription || data.description);
+      }
+    };
+
+    generatePersona();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
 
   // click-outside to close share menu
   useEffect(() => {
@@ -234,12 +277,8 @@ export default function ArchetypeReveal(): JSX.Element {
         style={{ WebkitTapHighlightColor: "transparent" }}
       >
         {/* Progress Indicator */}
-        <ProgressIndicator 
-          currentStep={5} 
-          totalSteps={6}
-          showNext={false}
-        />
-        
+        <ProgressIndicator currentStep={5} totalSteps={6} showNext={false} />
+
         <div className="md:max-w-[1330px] w-96  md:w-full p-4 sm:p-12 flex flex-col items-center justify-center gap-4 sm:gap-8 overflow-hidden bg-[#020202] text-white min-h-screen sm:min-h-0">
           {/* Background Layer (ring wave + ambient) */}
           <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -291,8 +330,9 @@ export default function ArchetypeReveal(): JSX.Element {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <div className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 rounded-xl backdrop-blur-xl border border-white/20"
-                style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+              <div
+                className="flex items-center gap-2 px-3 py-2 md:px-4 md:py-3 rounded-xl backdrop-blur-xl border border-white/20"
+                style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
               >
                 <Home className="w-4 h-4 md:w-5 md:h-5 text-white/80 group-hover:text-white transition-colors" />
                 <span className="text-xs md:text-sm font-black text-white/80 group-hover:text-white transition-colors hidden sm:inline">
@@ -334,7 +374,6 @@ export default function ArchetypeReveal(): JSX.Element {
             </div>
           </div>
 
-
           {/* --- CENTER: 3D CARD --- */}
           <div
             className="z-10 flex-1 flex items-center justify-center relative w-full"
@@ -358,9 +397,9 @@ export default function ArchetypeReveal(): JSX.Element {
               {/* FRONT */}
               <div
                 className="absolute inset-0 flex items-center justify-center rounded-3xl sm:rounded-[48px] border border-white/10 backdrop-blur-md"
-                style={{ 
-                  backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.1)',
-                  backfaceVisibility: "hidden" 
+                style={{
+                  backgroundColor: "rgba(var(--color-theme-primary-rgb), 0.1)",
+                  backfaceVisibility: "hidden",
                 }}
               >
                 <div className="text-2xl sm:text-4xl animate-pulse opacity-40">

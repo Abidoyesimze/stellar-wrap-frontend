@@ -1,44 +1,66 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Wallet, Copy } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { useWrapperStore } from '../store/useWrapperStore';
-import { connectFreighter } from '../utils/walletConnect';
-import { ProgressIndicator } from '../components/ProgressIndicator';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Wallet, Copy } from "lucide-react";
+import { motion } from "framer-motion";
+import { useWrapStore } from "../store/wrapStore";
+import {
+  connectFreighter,
+  isValidStellarAddress,
+} from "../utils/walletConnect";
+import { ProgressIndicator } from "../components/ProgressIndicator";
 
 export default function ConnectPage() {
   const router = useRouter();
-  const { setAddress, setConnecting, setError, error, isConnecting } = useWrapperStore();
-  const [walletAddress, setWalletAddress] = useState('');
+  const { setAddress, setError, setStatus } = useWrapStore();
+  const [walletAddress, setWalletAddress] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setLocalError] = useState<string | null>(null);
 
   const handleFreighterConnect = async () => {
-    setConnecting(true);
-    setError(null);
+    setIsConnecting(true);
+    setLocalError(null);
+    setStatus("loading");
 
     try {
       const publicKey = await connectFreighter();
       setAddress(publicKey);
-      router.push('/loading');
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to connect wallet';
+      setError(null);
+      router.push("/loading");
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to connect wallet";
       setError(errorMessage);
+      setLocalError(errorMessage);
+      setStatus("error");
     } finally {
-      setConnecting(false);
+      setIsConnecting(false);
     }
   };
 
   const handleManualSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (walletAddress.trim()) {
-      setAddress(walletAddress.trim());
-      router.push('/loading');
+
+    if (!walletAddress.trim()) {
+      setLocalError("Please enter a wallet address");
+      return;
     }
+
+    // Validate Stellar address format
+    if (!isValidStellarAddress(walletAddress)) {
+      setLocalError("Invalid wallet address. Please check and try again.");
+      setError("Invalid wallet address");
+      return;
+    }
+
+    setAddress(walletAddress.trim());
+    router.push("/loading");
   };
 
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setWalletAddress(e.target.value);
+    setLocalError(null);
     setError(null);
   };
 
@@ -46,9 +68,10 @@ export default function ConnectPage() {
     try {
       const text = await navigator.clipboard.readText();
       setWalletAddress(text);
+      setLocalError(null);
       setError(null);
-    } catch (err) {
-      setError('Failed to paste from clipboard');
+    } catch {
+      setError("Failed to paste from clipboard");
     }
   };
 
@@ -57,30 +80,27 @@ export default function ConnectPage() {
   };
 
   const handleDemoMode = () => {
-    const demoAddress = 'GDEMOADDRESSFORSTELLARWRAPDEMOPURPOSES12345678';
+    const demoAddress = "GDEMOADDRESSFORSTELLARWRAPDEMOPURPOSES12345678";
     setWalletAddress(demoAddress);
     setTimeout(() => {
       setAddress(demoAddress);
-      router.push('/loading');
+      setStatus("loading");
+      router.push("/loading");
     }, 100);
   };
 
   const onBack = () => {
-    router.push('/');
+    router.push("/");
   };
 
   return (
-    <div className="relative w-full min-h-screen h-screen overflow-hidden flex items-center justify-center" style={{ backgroundColor: 'var(--color-theme-background)' }}>
+    <div className="relative w-full min-h-screen h-screen overflow-hidden flex items-center justify-center bg-theme-background">
       {/* Progress Indicator */}
-      <ProgressIndicator 
-        currentStep={2} 
-        totalSteps={6}
-        showNext={false}
-      />
-      
+      <ProgressIndicator currentStep={2} totalSteps={6} showNext={false} />
+
       {/* Background elements */}
       <div className="absolute inset-0 bg-gradient-to-br from-black via-black to-black opacity-60" />
-      
+
       {/* Animated grid background */}
       <div className="absolute inset-0 opacity-20">
         <motion.div
@@ -88,15 +108,15 @@ export default function ConnectPage() {
           style={{
             backgroundImage: `linear-gradient(rgba(var(--color-theme-primary-rgb), 0.3) 1px, transparent 1px),
                              linear-gradient(90deg, rgba(var(--color-theme-primary-rgb), 0.3) 1px, transparent 1px)`,
-            backgroundSize: '100px 100px',
+            backgroundSize: "100px 100px",
           }}
           animate={{
-            backgroundPosition: ['0px 0px', '100px 100px'],
+            backgroundPosition: ["0px 0px", "100px 100px"],
           }}
           transition={{
             duration: 3,
             repeat: Infinity,
-            ease: "linear"
+            ease: "linear",
           }}
         />
       </div>
@@ -104,7 +124,7 @@ export default function ConnectPage() {
       {/* Glowing orbs */}
       <motion.div
         className="absolute w-96 h-96 rounded-full blur-[120px]"
-        style={{ backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.3)' }}
+        style={{ backgroundColor: "rgba(var(--color-theme-primary-rgb), 0.3)" }}
         animate={{
           scale: [1, 1.3, 1],
           opacity: [0.3, 0.5, 0.3],
@@ -114,7 +134,7 @@ export default function ConnectPage() {
         transition={{
           duration: 5,
           repeat: Infinity,
-          ease: "easeInOut"
+          ease: "easeInOut",
         }}
       />
 
@@ -128,8 +148,9 @@ export default function ConnectPage() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <div className="flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-xl border border-white/20"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        <div
+          className="flex items-center gap-2 px-4 py-3 rounded-xl backdrop-blur-xl border border-white/20"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
         >
           <ArrowLeft className="w-5 h-5 text-white group-hover:text-white/80 transition-colors" />
           <span className="text-sm font-black text-white/80 group-hover:text-white transition-colors hidden sm:inline">
@@ -159,7 +180,9 @@ export default function ConnectPage() {
             <div className="relative">
               <motion.div
                 className="absolute inset-0 blur-2xl rounded-full"
-                style={{ backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.4)' }}
+                style={{
+                  backgroundColor: "rgba(var(--color-theme-primary-rgb), 0.4)",
+                }}
                 animate={{
                   opacity: [0.5, 0.8, 0.5],
                 }}
@@ -168,23 +191,27 @@ export default function ConnectPage() {
                   repeat: Infinity,
                 }}
               />
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center border-2"
-                style={{ 
-                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
-                  borderColor: 'rgba(var(--color-theme-primary-rgb), 0.5)',
+              <div
+                className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-2xl flex items-center justify-center border-2"
+                style={{
+                  backgroundColor: "rgba(0, 0, 0, 0.7)",
+                  borderColor: "rgba(var(--color-theme-primary-rgb), 0.5)",
                 }}
               >
-                <Wallet className="w-10 h-10 sm:w-12 sm:h-12" style={{ color: 'var(--color-theme-primary)' }} />
+                <Wallet
+                  className="w-10 h-10 sm:w-12 sm:h-12"
+                  style={{ color: "var(--color-theme-primary)" }}
+                />
               </div>
             </div>
           </motion.div>
 
-          <h1 
+          <h1
             className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-3 md:mb-4 tracking-tight leading-none"
             style={{
               background: `linear-gradient(180deg, #ffffff 0%, var(--color-theme-primary) 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
             }}
           >
             CONNECT WALLET
@@ -202,7 +229,9 @@ export default function ConnectPage() {
         >
           <motion.div
             className="absolute -inset-1 rounded-2xl blur-xl"
-            style={{ backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.3)' }}
+            style={{
+              backgroundColor: "rgba(var(--color-theme-primary-rgb), 0.3)",
+            }}
             animate={{
               opacity: [0.3, 0.5, 0.3],
             }}
@@ -211,17 +240,18 @@ export default function ConnectPage() {
               repeat: Infinity,
             }}
           />
-          
-          <div className="relative backdrop-blur-xl p-6 sm:p-8 rounded-2xl border"
-            style={{ 
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              borderColor: 'rgba(var(--color-theme-primary-rgb), 0.3)',
+
+          <div
+            className="relative backdrop-blur-xl p-6 sm:p-8 rounded-2xl border"
+            style={{
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+              borderColor: "rgba(var(--color-theme-primary-rgb), 0.3)",
             }}
           >
             <label className="block text-sm font-black text-white/70 mb-3 tracking-wider">
               STELLAR ADDRESS
             </label>
-            
+
             <div className="relative mb-6">
               <input
                 type="text"
@@ -230,12 +260,14 @@ export default function ConnectPage() {
                 placeholder="Paste your Stellar address here"
                 className="w-full px-5 py-4 rounded-xl font-mono text-sm sm:text-base border-2 transition-all duration-200 focus:outline-none"
                 style={{
-                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                  borderColor: error ? 'rgba(239, 68, 68, 0.5)' : 'rgba(255, 255, 255, 0.1)',
-                  color: 'white',
+                  backgroundColor: "rgba(0, 0, 0, 0.5)",
+                  borderColor: error
+                    ? "rgba(239, 68, 68, 0.5)"
+                    : "rgba(255, 255, 255, 0.1)",
+                  color: "white",
                 }}
               />
-              
+
               <motion.button
                 onClick={handlePaste}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-white/10 transition-colors"
@@ -243,7 +275,10 @@ export default function ConnectPage() {
                 whileTap={{ scale: 0.9 }}
                 title="Paste from clipboard"
               >
-                <Copy className="w-5 h-5" style={{ color: 'var(--color-theme-primary)' }} />
+                <Copy
+                  className="w-5 h-5"
+                  style={{ color: "var(--color-theme-primary)" }}
+                />
               </motion.button>
             </div>
 
@@ -258,12 +293,18 @@ export default function ConnectPage() {
               onClick={handleConnect}
               disabled={!walletAddress.trim() || isConnecting}
               className="w-full relative group disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: !walletAddress.trim() || isConnecting ? 1 : 1.02 }}
-              whileTap={{ scale: !walletAddress.trim() || isConnecting ? 1 : 0.98 }}
+              whileHover={{
+                scale: !walletAddress.trim() || isConnecting ? 1 : 1.02,
+              }}
+              whileTap={{
+                scale: !walletAddress.trim() || isConnecting ? 1 : 0.98,
+              }}
             >
               <motion.div
                 className="absolute -inset-1 rounded-xl blur-lg"
-                style={{ backgroundColor: 'rgba(var(--color-theme-primary-rgb), 0.4)' }}
+                style={{
+                  backgroundColor: "rgba(var(--color-theme-primary-rgb), 0.4)",
+                }}
                 animate={{
                   opacity: [0.5, 0.8, 0.5],
                 }}
@@ -272,13 +313,18 @@ export default function ConnectPage() {
                   repeat: Infinity,
                 }}
               />
-              
-              <div 
+
+              <div
                 className="relative px-8 py-5 rounded-xl font-black text-lg sm:text-xl tracking-tight transition-all duration-200 flex items-center justify-center gap-3"
                 style={{
-                  backgroundColor: isConnecting ? 'rgba(var(--color-theme-primary-rgb), 0.5)' : 'var(--color-theme-primary)',
-                  color: '#000000',
-                  cursor: (!walletAddress.trim() || isConnecting) ? 'not-allowed' : 'pointer',
+                  backgroundColor: isConnecting
+                    ? "rgba(var(--color-theme-primary-rgb), 0.5)"
+                    : "var(--color-theme-primary)",
+                  color: "#000000",
+                  cursor:
+                    !walletAddress.trim() || isConnecting
+                      ? "not-allowed"
+                      : "pointer",
                 }}
               >
                 {isConnecting ? (
@@ -287,7 +333,7 @@ export default function ConnectPage() {
                     <span>CONNECTING...</span>
                   </>
                 ) : (
-                  'START WRAPPING'
+                  "START WRAPPING"
                 )}
               </div>
             </motion.button>
@@ -302,7 +348,7 @@ export default function ConnectPage() {
                 disabled={isConnecting}
                 className="w-full px-6 py-4 bg-transparent border-2 rounded-xl font-bold text-white/70 hover:text-white transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  borderColor: 'rgba(var(--color-theme-primary-rgb), 0.3)',
+                  borderColor: "rgba(var(--color-theme-primary-rgb), 0.3)",
                 }}
                 whileHover={{ scale: isConnecting ? 1 : 1.02 }}
                 whileTap={{ scale: isConnecting ? 1 : 0.98 }}
@@ -314,7 +360,10 @@ export default function ConnectPage() {
                   </>
                 ) : (
                   <>
-                    <Wallet className="w-5 h-5" style={{ color: 'var(--color-theme-primary)' }} />
+                    <Wallet
+                      className="w-5 h-5"
+                      style={{ color: "var(--color-theme-primary)" }}
+                    />
                     <span>Connect with Freighter</span>
                   </>
                 )}
@@ -323,13 +372,13 @@ export default function ConnectPage() {
 
             <div className="mt-6 pt-6 border-t border-white/10">
               <p className="text-xs sm:text-sm text-white/50 text-center mb-3">
-                Don't have a Stellar wallet?{' '}
-                <a 
-                  href="https://stellar.org/wallets" 
-                  target="_blank" 
+                Don&apos;t have a Stellar wallet?{" "}
+                <a
+                  href="https://stellar.org/wallets"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="font-bold hover:text-white/80 transition-colors"
-                  style={{ color: 'var(--color-theme-primary)' }}
+                  style={{ color: "var(--color-theme-primary)" }}
                 >
                   Get one here
                 </a>

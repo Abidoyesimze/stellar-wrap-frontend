@@ -26,7 +26,7 @@ describe("AssetResolver", () => {
       clear: vi.fn(),
       length: 0,
       key: vi.fn(),
-    } as any;
+    } as unknown as Storage;
     // Mock fetch if needed
     vi.clearAllMocks();
   });
